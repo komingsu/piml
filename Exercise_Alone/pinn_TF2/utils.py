@@ -1,5 +1,6 @@
 import scipy
 import os
+import sys
 import numpy as np
 from pyDOE import lhs
 import tensorflow as tf
@@ -13,6 +14,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 mpl.use('pgf')
+repoPath = os.path.join(".", "PINNs")
+utilsPath = os.path.join(repoPath, "Utilities")
+dataPath = os.path.join(repoPath, "main", "Data")
+appDataPath = os.path.join(repoPath, "appendix", "Data")
+sys.path.insert(0, utilsPath)
 
 def figsize(scale, nplots = 1):
     fig_width_pt = 390.0                          # Get this from LaTeX using \the\textwidth
@@ -116,7 +122,7 @@ def prep_data(path, N_u=None, N_f=None, N_n=None, q=None, ub=None, lb=None, nois
         u_1 = Exact_u[idx_x,idx_t_1][:,None]
         u_1 = u_1 + noise*np.std(u_1)*np.random.randn(u_1.shape[0], u_1.shape[1])
 
-        dt = np.asscalar(t[idx_t_1] - t[idx_t_0])        
+        dt = (t[idx_t_1] - t[idx_t_0]).item()        
         q = int(np.ceil(0.5*np.log(np.finfo(float).eps)/np.log(dt)))
 
         # Load IRK weights
@@ -375,13 +381,9 @@ def plot_ide_disc_results(x_star, t_star, idx_t_0, idx_t_1, x_0, u_0, x_1, u_1,
     ax = plt.subplot(gs2[0, 0])
     ax.axis('off')
     nu = 0.01/np.pi
-    s1 = r'$\begin{tabular}{ |c|c| }  \hline Correct PDE & $u_t + u u_x + %.6f u_{xx} = 0$ \\  \hline Identified PDE (clean data) & ' % (nu)
-    s2 = r'$u_t + %.3f u u_x + %.6f u_{xx} = 0$ \\  \hline ' % (lambda_1_value, lambda_2_value)
-    s3 = r'Identified PDE (1\% noise) & '
-    s4 = r'$u_t + %.3f u u_x + %.6f u_{xx} = 0$  \\  \hline ' % (lambda_1_value_noisy, lambda_2_value_noisy)
-    s5 = r'\end{tabular}$'
-    s = s1+s2+s3+s4+s5
-    ax.text(-0.1,0.2,s)
+    s = r"\begin{tabular}{ |c|c| }  \hline Correct PDE & $u_t + u u_x + %.6f u_{xx} = 0$ \\  \hline Identified PDE (clean data) & $u_t + %.3f u u_x + %.6f u_{xx} = 0$ \\  \hline Identified PDE (1%% noise) & $u_t + %.3f u u_x + %.6f u_{xx} = 0$  \\  \hline \end{tabular}" % (0.003183, lambda_1_value, lambda_2_value, lambda_1_value_noisy, lambda_2_value_noisy)
+
+    ax.text(-0.1, 0.2, s)
     plt.show()
     if file != None:
         savefig(file)
@@ -459,13 +461,13 @@ def plot_ide_cont_results(X_star, u_pred, X_u_train, u_train, \
     
     ax = plt.subplot(gs2[:, :])
     ax.axis('off')
-    s1 = r'$\begin{tabular}{ |c|c| }  \hline Correct PDE & $u_t + u u_x - 0.0031831 u_{xx} = 0$ \\  \hline Identified PDE (clean data) & '
-    s2 = r'$u_t + %.5f u u_x - %.7f u_{xx} = 0$ \\  \hline ' % (lambda_1_value, lambda_2_value)
-    s3 = r'Identified PDE (1\% noise) & '
-    s4 = r'$u_t + %.5f u u_x - %.7f u_{xx} = 0$  \\  \hline ' % (lambda_1_value_noisy, lambda_2_value_noisy)
-    s5 = r'\end{tabular}$'
-    s = s1+s2+s3+s4+s5
-    ax.text(0.1,0.1,s)
+    # s1 = r'$\begin{tabular}{ |c|c| }  \hline Correct PDE & $u_t + u u_x - 0.0031831 u_{xx} = 0$ \\  \hline Identified PDE (clean data) & '
+    # s2 = r'$u_t + %.5f u u_x - %.7f u_{xx} = 0$ \\  \hline ' % (lambda_1_value, lambda_2_value)
+    # s3 = r'Identified PDE (1\% noise) & '
+    # s4 = r'$u_t + %.5f u u_x - %.7f u_{xx} = 0$  \\  \hline ' % (lambda_1_value_noisy, lambda_2_value_noisy)
+    # s5 = r'\end{tabular}$'
+    # s = s1+s2+s3+s4+s5
+    # ax.text(0.1,0.1,s)
     plt.show()
     
     if file != None:
