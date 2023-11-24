@@ -3,7 +3,7 @@ import math
 import numpy as np
 import torch
 from torch.nn import Parameter
-from torch.nn.modules.module import Module
+from torch.nn import Module
 import torch.nn.functional as F
 
 class PruningModule(Module):
@@ -33,7 +33,7 @@ class PruningModule(Module):
         # Note that module here is the layer
         # ex) fc1, fc2, fc3
         for name, module in self.named_modules():
-            if name in ['fc1', 'fc2', 'fc3']:
+            if name.startswith("fc"):
                 module.prune(threshold=percentile_value)
 
     def prune_by_std(self, s=0.25):
@@ -46,7 +46,7 @@ class PruningModule(Module):
         Note : In the paper, the authors used different sensitivity values for different layers.
         """
         for name, module in self.named_modules():
-            if name in ['fc1', 'fc2', 'fc3']:
+            if name.startswith("fc"):
                 threshold = np.std(module.weight.data.cpu().numpy()) * s
                 print(f'Pruning with threshold : {threshold} for layer {name}')
                 module.prune(threshold)
