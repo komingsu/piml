@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .prune import PruningModule, MaskedLinear
+from .network import *
 
 class NN(PruningModule):
     def __init__(self, mask=False):
