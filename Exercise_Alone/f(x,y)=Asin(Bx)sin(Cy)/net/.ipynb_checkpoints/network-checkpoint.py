@@ -4,6 +4,8 @@ import torch.nn as nn
 import math
 import numpy as np
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class LayerPerceptron(torch.nn.Module):
     def __init__(
         self,
@@ -183,7 +185,9 @@ class InputScaleNet(torch.nn.Module):
             self.centers = torch.zeros_like(self.scales, dtype=torch.float)
         else:
             self.centers = torch.from_numpy(np.array(centers)).type(torch.float)
-
+            
+        self.centers = self.centers.to(device)
+        self.scales = self.scales.to(device)
 
     def forward(self,x):
         """
@@ -208,23 +212,19 @@ class MultiScaleMLPSequential(torch.nn.Module):
         base_scale = 2.0,   # base scale factor
         in_scale   = None,  # scale factor of input (ex [x,y,t])
         in_center  = None,  # Center position of coordinate translation (ex [x,y,t])
-        latent_vec = None,  # latent vector (ex Tensor[shape=(4,16)] )
+        vec_scen   = 4,     # number of latent vector scenarios
+        vec_size   = 16,    # size of latent vector
     ):
         """
             Initialize MultiScaleMLPSequential
         """
         super(MultiScaleMLPSequential,self).__init__()
         self.subnets = subnets
-        self.scale_coef = [amp * (base_scale**i) for i in range(self.subnets)]
-        self.latent_vec = latent_vec
-        
-        if self.latent_vec is not None:
-            self.num_scenarios = latent_vec.shape[0]
-            self.latent_size = latent_vec.shape[1]
-            in_dim += self.latent_size
-        else:
-            self.num_scenarios = 1
-            self.latent_size = 0
+        self.scale_coef = torch.Tensor([amp * (base_scale**i) for i in range(self.subnets)])
+        self.num_scenarios = vec_scen
+        self.latent_size = vec_size
+        self.latent_vec = torch.from_numpy(np.random.randn(vec_scen, vec_size) / np.sqrt(vec_size)).type(torch.float)
+        in_dim += self.latent_size
 
         # Define MultiScaleMLP
         self.msnet = nn.Sequential()
@@ -242,17 +242,18 @@ class MultiScaleMLPSequential(torch.nn.Module):
             self.in_scale = InputScaleNet(in_scale, in_center)
         else:
             self.in_scale = torch.nn.Identity()
-
+        
+        self.latent_vec = self.latent_vec.to(device)
 
     def forward(self,x):
         """
             Forward propagate
         """
         x = self.in_scale(x)
-        if self.latent_vec is not None:
-            batch_size = x.shape[0]
-            latent_vectors = self.latent_vec.view(self.num_scenarios, 1, self.latent_size).repeat(1,batch_size//self.num_scenarios,1).view(-1,self.latent_size)
-            x = torch.concat([x, latent_vectors], axis=1)
+
+        batch_size = x.shape[0]
+        latent_vectors = self.latent_vec.view(self.num_scenarios, 1, self.latent_size).repeat(1,batch_size//self.num_scenarios,1).view(-1,self.latent_size)
+        x = torch.concat([x, latent_vectors], axis=1)
         
         out = 0
         for i in range(self.subnets):
@@ -260,12 +261,17 @@ class MultiScaleMLPSequential(torch.nn.Module):
             out = out + self.msnet[i](x_s)
         return out
     
+# def calc_latent_init(latent_size, latent_vector_ckpt, mode, num_scenarios):
+#     if mode == "pretrain":
+#         latent_init = np.random.randn(num_scenarios, latent_size) / np.sqrt(latent_size)
+#     else:
+#         latent_norm = np.mean(np.linalg.norm(latent_vector_ckpt, axis=1))
+#         print("check mean latent vector norm: ", latent_norm)
+#         latent_init = np.zeros((num_scenarios, latent_size))
+#     latent_vector = torch.from_numpy(latent_init).type(torch.float)
+#     return latent_vector
+
 def calc_latent_init(latent_size, latent_vector_ckpt, mode, num_scenarios):
-    if mode == "pretrain":
-        latent_init = np.random.randn(num_scenarios, latent_size) / np.sqrt(latent_size)
-    else:
-        latent_norm = np.mean(np.linalg.norm(latent_vector_ckpt, axis=1))
-        print("check mean latent vector norm: ", latent_norm)
-        latent_init = np.zeros((num_scenarios, latent_size))
+    latent_init = np.random.randn(num_scenarios, latent_size) / np.sqrt(latent_size)
     latent_vector = torch.from_numpy(latent_init).type(torch.float)
     return latent_vector

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from .prune import PruningModule, MaskedLinear
 from .network import *
 
-class NN(PruningModule):
+class NN1(PruningModule):
     def __init__(self, mask=False):
         super(NN, self).__init__()
         linear = MaskedLinear if mask else nn.Linear
@@ -28,3 +28,5 @@ class NN(PruningModule):
         x = torch.tanh(self.fc7(x))
         x = self.fc8(x)
         return x
+    
+class NN2(torch.nn.Mo)
