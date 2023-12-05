@@ -224,6 +224,8 @@ class MultiScaleMLPSequential(torch.nn.Module):
         self.num_scenarios = vec_scen
         self.latent_size = vec_size
         self.latent_vec = torch.from_numpy(np.random.randn(vec_scen, vec_size) / np.sqrt(vec_size)).type(torch.float)
+        self.latent_vec.requires_grad = True
+        
         in_dim += self.latent_size
 
         # Define MultiScaleMLP
