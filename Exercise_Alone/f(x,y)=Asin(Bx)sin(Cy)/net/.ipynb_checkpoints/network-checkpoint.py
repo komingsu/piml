@@ -275,3 +275,54 @@ def calc_latent_init(latent_size, latent_vector_ckpt, mode, num_scenarios):
     latent_init = np.random.randn(num_scenarios, latent_size) / np.sqrt(latent_size)
     latent_vector = torch.from_numpy(latent_init).type(torch.float)
     return latent_vector
+
+
+class LatentMLPSequential(torch.nn.Module):
+    def __init__(
+        self,
+        in_dim     = None,
+        out_dim    = None,
+        layers     = None,
+        neurons    = None,
+        residual   = False, # use residual | [True, False]
+        w_init     = False, # constant std | (ex 0.1, 0.01)
+        b_init     = False, # use bias | [True, False]
+        act        = nn.Tanh(),
+        in_scale   = None,  # scale factor of input (ex [x,y,t])
+        in_center  = None,  # Center position of coordinate translation (ex [x,y,t])
+        vec_scen   = 4,     # number of latent vector scenarios
+        vec_size   = 16,    # size of latent vector
+    ):
+        """
+            Initialize MultiScaleMLPSequential
+        """
+        super(LatentMLPSequential,self).__init__()
+        self.num_scenarios = vec_scen
+        self.latent_size = vec_size
+        self.latent_vec = torch.from_numpy(np.random.randn(vec_scen, vec_size) / np.sqrt(vec_size)).type(torch.float)
+        self.latent_vec.requires_grad = True
+        in_dim += self.latent_size
+
+        # Define MultiScaleMLP
+        self.lvnet = MLPSequential(in_dim=in_dim,
+                                   out_dim=out_dim,
+                                   layers=layers,
+                                   neurons=neurons,
+                                   residual=residual,
+                                   w_init=w_init,
+                                   b_init=b_init,
+                                   act=act,
+                                  )
+        
+        self.latent_vec = self.latent_vec.to(device)
+
+    def forward(self,x):
+        """
+            Forward propagate
+        """
+        batch_size = x.shape[0]
+        latent_vectors = self.latent_vec.view(self.num_scenarios, 1, self.latent_size).repeat(1,batch_size//self.num_scenarios,1).view(-1,self.latent_size)
+        x = torch.concat([x, latent_vectors], axis=1)
+        
+        out = self.lvnet(x)
+        return out
