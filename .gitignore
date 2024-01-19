@@ -1,0 +1,12 @@
+*.dat*
+*.npy*
+*Untitled*
+*pycache*
+*.pt
+*/.venv/*
+*/.ipynb_checkpoints/*
+*/.idea/*
+*/.pytest_cache/*
+*/.git/*
+*/.gitignore*
+*/.DS_Store*
