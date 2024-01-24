@@ -23,7 +23,7 @@ class NS_dataset(Dataset):
         headers = ["t", "x", "y", "p", "u", "v"]
         return {key: self.examples[idx, i] for i, key in enumerate(headers)}
 
-def load_jsonl(path, skip_first_lines: int = 0):
+def load_json(path, skip_first_lines: int = 0):
     with open(path, "r") as f:
         for _ in range(skip_first_lines):
             next(f)
@@ -35,7 +35,7 @@ def dump_json(path, data):
         json.dump(data, f, indent=4)
 
 def get_dataset(data_path: Path):
-    data = load_jsonl(data_path, skip_first_lines=1)
+    data = load_json(data_path, skip_first_lines=1)
     random.shuffle(data)
 
     # It's weird that the test data is a subset of train data, but
@@ -50,8 +50,8 @@ def get_dataset(data_path: Path):
     min_x = min([d[1] for d in train_data])
     max_x = max([d[1] for d in train_data])
 
-    train_data = data_set(train_data)
-    test_data = data_set(test_data)
+    train_data = NS_dataset(train_data)
+    test_data = NS_dataset(test_data)
     return train_data, test_data, min_x, max_x
 
 def get_orig_dataset(data_path: Path = None):
@@ -96,8 +96,8 @@ def get_orig_dataset(data_path: Path = None):
     # Randomly sample 1000 points as test data
     idx = np.random.choice(train_data.shape[0], 1000, replace=False)
     test_data = train_data[idx, :]
-    train_data = PinnDataset(train_data)
-    test_data = PinnDataset(test_data)
+    train_data = NS_dataset(train_data)
+    test_data = NS_dataset(test_data)
     return train_data, test_data, min_x, max_x
 
 if __name__ == "__main__":
