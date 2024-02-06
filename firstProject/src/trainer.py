@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import RandomSampler, DataLoader
 
-from models import PinnBaseline
-from dataset import PinnDataset, dump_json
+from .models import PinnBaseline
+from .dataset import NS_dataset, dump_json
 
 class Trainer:
     """Trainer for convenient training and testing"""
@@ -63,7 +63,7 @@ class Trainer:
             return None
         return ckpt_dirs[-1]
 
-    def train(self, train_data: PinnDataset, do_resume: bool = True):
+    def train(self, train_data: NS_dataset, do_resume: bool = True):
         model = self.model
         device = self.device
 
@@ -164,7 +164,7 @@ class Trainer:
             torch.load(ckpt_dir / "lr_scheduler.pt")
         )
 
-    def predict(self, test_data: PinnDataset) -> dict:
+    def predict(self, test_data: NS_dataset) -> dict:
         batch_size = self.batch_size * 32
         test_loader = DataLoader(
             test_data, batch_size=batch_size, shuffle=False

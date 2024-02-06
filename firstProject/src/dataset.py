@@ -101,5 +101,5 @@ def get_orig_dataset(data_path: Path = None):
     return train_data, test_data, min_x, max_x
 
 if __name__ == "__main__":
-    dataset = get_dataset(data_path="C:/Users/enomazosii/OneDrive/document/GitHub/piml/firstProject/data/cylinder_nektar_wake.mat")
+    dataset = get_orig_dataset(data_path="C:/Users/enomazosii/OneDrive/document/GitHub/piml/firstProject/data/cylinder_nektar_wake.mat")
     print("📌")

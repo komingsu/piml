@@ -4,7 +4,7 @@ import torch
 from torch import nn, Tensor
 from torch.nn import functional as F
 
-from operator import calc_grad
+from .th_operator import calc_grad
 
 
 class PinnBaseline(nn.Module):
