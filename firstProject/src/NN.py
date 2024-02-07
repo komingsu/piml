@@ -190,4 +190,3 @@ class PINN(nn.Module):
         # build the PINN model for the steady Navier-Stokes equation
         return uv_eqn, uv_in, uv_out, uv_w1, uv_w2, uv_circle
     
-    
