@@ -18,8 +18,9 @@ class MultiLayerPerceptronClass(nn.Module):
         h_dim_list = [256,256],
         y_dim      = 10,
         actv       = nn.ReLU(),
-        p_drop     = 0.2,
-        batch_norm = True
+        p_drop     = 0.0,
+        batch_norm = False,
+        list_output= False
     ):
         """
             Initialize MLP
@@ -32,6 +33,7 @@ class MultiLayerPerceptronClass(nn.Module):
         self.actv       = actv
         self.p_drop     = p_drop
         self.batch_norm = batch_norm
+        self.list_output= list_output
         
         # Declare layers
         self.layer_list = []
@@ -80,7 +82,10 @@ class MultiLayerPerceptronClass(nn.Module):
             intermediate_output_list.append(x)
         # Final output
         final_output = x
-        return final_output,intermediate_output_list
+        if self.list_output:
+            return final_output,intermediate_output_list
+        else:
+            return final_output
 
 class GradientLayer(nn.Module):
     """
@@ -108,31 +113,34 @@ class GradientLayer(nn.Module):
         y.requires_grad_(True)
         t.requires_grad_(True)
         # Combine x and y and predict u, v, p
-        u_v_p, _ = self.model(th.stack([x, y, t], dim=-1))
-        u, v, p = u_v_p[..., 0], u_v_p[..., 1], u_v_p[..., 2]
+        output = self.model(th.stack([x, y, t], dim=-1))
+        psi = output[..., 0]
+        p_pred = output[..., 1]
+        u_pred = calc_grad(psi, y)
+        v_pred = -calc_grad(psi, x)
         
         # First derivatives
-        u_x = calc_grad(u.sum(), x)
-        u_y = calc_grad(u.sum(), y)
-        u_t = calc_grad(u.sum(), t)
+        u_x = calc_grad(u_pred, x)
+        u_y = calc_grad(u_pred, y)
+        u_t = calc_grad(u_pred, t)
         
-        v_x = calc_grad(v.sum(), x)
-        v_y = calc_grad(v.sum(), y)
-        v_t = calc_grad(v.sum(), t)
+        v_x = calc_grad(v_pred, x)
+        v_y = calc_grad(v_pred, y)
+        v_t = calc_grad(v_pred, t)
         
-        p_x = calc_grad(p.sum(), x)
-        p_y = calc_grad(p.sum(), y)
+        p_x = calc_grad(p_pred, x)
+        p_y = calc_grad(p_pred, y)
 
         # Second derivatives
-        u_xx = calc_grad(u_x.sum(), x)
-        u_yy = calc_grad(u_y.sum(), y)
+        u_xx = calc_grad(u_x, x)
+        u_yy = calc_grad(u_y, y)
         
-        v_xx = calc_grad(v_x.sum(), x)
-        v_yy = calc_grad(v_y.sum(), y)
+        v_xx = calc_grad(v_x, x)
+        v_yy = calc_grad(v_y, y)
 
-        p_grads = (p, p_x, p_y)
-        u_grads = (u, u_x, u_y, u_t, u_xx, u_yy)
-        v_grads = (v, v_x, v_y, v_t, v_xx, v_yy)
+        p_grads = (p_pred, p_x, p_y)
+        u_grads = (u_pred, u_x, u_y, u_t, u_xx, u_yy)
+        v_grads = (v_pred, v_x, v_y, v_t, v_xx, v_yy)
 
         return p_grads, u_grads, v_grads
 
@@ -156,28 +164,36 @@ class PINN(nn.Module):
         xyt_circle = combined_batch["circle"]
         xyt_initial = combined_batch["initial"]
         
+        in_shape = xyt_in.shape[0]
+        
+        # xyt_in
+        inlet = xyt_in[..., 1].unsqueeze(-1)
+        inlet = 4*(inlet/8)*(1-(inlet/8))
+        zeros = th.zeros((in_shape, 1)).to("cuda")
+        inlet = th.cat([inlet, zeros, inlet], dim = -1)
+        
         # compute gradients relative to equation
         p_grads, u_grads, v_grads = self.grads(xyt_eqn)
-        _, p_x, p_y = p_grads
+        p, p_x, p_y = p_grads
         u, u_x, u_y, u_t, u_xx, u_yy = u_grads
         v, v_x, v_y, v_t, v_xx, v_yy = v_grads
         
         # compute equation loss
         def PDE_eqn():
-            u_eqn =  u_t + u*u_x + v*u_y + p_x/self.rho - self.mu*(u_xx + u_yy) / self.rho
-            v_eqn =  v_t + u*v_x + v*v_y + p_y/self.rho - self.mu*(v_xx + v_yy) / self.rho
+            u_eqn =  u_t + u*u_x + v*u_y + p_x - self.mu*(u_xx + u_yy) / self.rho
+            v_eqn =  v_t + u*v_x + v*v_y + p_y - self.mu*(v_xx + v_yy) / self.rho
             uv_eqn = u_x + v_y
             
             u_eqn = u_eqn.unsqueeze(-1)
             v_eqn = v_eqn.unsqueeze(-1)
             uv_eqn = uv_eqn.unsqueeze(-1)
-            uv_eqn = th.cat([u_eqn, v_eqn], dim=1)
+            uv_eqn = th.cat([u_eqn, v_eqn, uv_eqn], dim=1)
             return uv_eqn
         
         # compute gradients relative to boundary condition
         def BC_eqn():  
-            # p_r, _, _ = self.grads(xyt_out)
-            # uv_out = p_r[0].unsqueeze(-1)
+            p_r, _, _ = self.grads(xyt_out)
+            uv_out = th.cat([p_r[0].unsqueeze(-1), p_r[0].unsqueeze(-1)], dim=1)
 
             p_l, u_grads_l, v_grads_l = self.grads(xyt_w1)
             uv_w1 = th.cat([u_grads_l[0].unsqueeze(-1), v_grads_l[0].unsqueeze(-1), p_l[2].unsqueeze(-1)], dim=1)
@@ -189,19 +205,7 @@ class PINN(nn.Module):
             uv_circle = th.cat([u_grads_l[0].unsqueeze(-1), v_grads_l[0].unsqueeze(-1), u_grads_l[0].unsqueeze(-1)], dim=1)
 
             _, u_inn, v_inn = self.grads(xyt_in)
-            uv_in = th.cat([u_inn[0].unsqueeze(-1), v_inn[0].unsqueeze(-1)], dim=1)
+            uv_in = th.cat([u_inn[0].unsqueeze(-1), v_inn[0].unsqueeze(-1), u_inn[0].unsqueeze(-1)], dim=1)
             
             # if you want to use the outlet boundary condition, add uv_out to the return statement
-            return uv_in, uv_w1, uv_w2, uv_circle
-
-        # compute gradients relative to initial condition
-        def IC_eqn():
-            _, u_initial, v_initial = self.grads(xyt_initial)
-            ic = th.cat([u_initial[0].unsqueeze(-1), v_initial[0].unsqueeze(-1)], dim=1)
-            return ic
-
-        PDE = PDE_eqn()
-        BC = BC_eqn()
-        IC = IC_eqn()
-        
-        return PDE, BC, IC
+            return uv_in, uv_w1, uv_w2, uv_circle, uv_out
