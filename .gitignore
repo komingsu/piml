@@ -40,3 +40,5 @@
 *.ckpt
 *.pt
 *.avi
+*/deepxde/*
+*.zip*
